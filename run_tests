@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Install test deps (if needed) and run the test suite.
+
+This script is intentionally small and idempotent: it will install pytest and
+pytest-cov into the current Python environment if they are missing, then run
+pytest. It is safe to run repeatedly in a clean environment.
+"""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+
+REQS = ("pytest", "pytest-cov")
+
+def ensure_requirements() -> None:
+    missing = [r for r in REQS if shutil.which(sys.executable) and not _is_package_installed(r)]
+    if missing:
+        print("Installing test dependencies:", " ".join(missing))
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade"] + missing)
+
+
+def _is_package_installed(name: str) -> bool:
+    try:
+        __import__(name)
+        return True
+    except Exception:
+        return False
+
+
+def main() -> int:
+    ensure_requirements()
+    cmd = [sys.executable, "-m", "pytest", "-q", "--cov=mini_humanize"]
+    return subprocess.call(cmd)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
