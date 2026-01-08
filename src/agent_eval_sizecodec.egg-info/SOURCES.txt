@@ -1,0 +1,14 @@
+README.md
+pyproject.toml
+src/agent_eval_sizecodec.egg-info/PKG-INFO
+src/agent_eval_sizecodec.egg-info/SOURCES.txt
+src/agent_eval_sizecodec.egg-info/dependency_links.txt
+src/agent_eval_sizecodec.egg-info/requires.txt
+src/agent_eval_sizecodec.egg-info/top_level.txt
+src/mini_humanize/__init__.py
+src/mini_humanize/__main__.py
+src/mini_humanize/sizecodec.py
+tests/test_cli.py
+tests/test_naturalsize.py
+tests/test_parse_size.py
+tests/test_roundtrip.py
