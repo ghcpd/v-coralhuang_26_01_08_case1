@@ -33,8 +33,17 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     if args.cmd == "format":
+        try:
+            value_num = int(args.value)
+        except ValueError:
+            try:
+                value_num = float(args.value)
+            except ValueError:
+                print(f"Error: Invalid numeric value: {args.value}", file=sys.stderr)
+                return 1
+        
         out = naturalsize(
-            args.value,
+            value_num,
             binary=args.binary,
             gnu=args.gnu,
             format=args.format,
@@ -45,20 +54,24 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "parse":
         strict = args.strict and not args.permissive
-        out = parse_size(
-            args.text,
-            default_binary=args.default_binary,
-            default_gnu=args.default_gnu,
-            allow_thousands_separator=args.allow_thousands_separator,
-            rounding=args.rounding,
-            strict=strict,
-            locale=args.locale,
-            allow_negative=args.allow_negative,
-            min_value=args.min_value,
-            max_value=args.max_value,
-        )
-        print(out)
-        return 0
+        try:
+            out = parse_size(
+                args.text,
+                default_binary=args.default_binary,
+                default_gnu=args.default_gnu,
+                allow_thousands_separator=args.allow_thousands_separator,
+                rounding=args.rounding,
+                strict=strict,
+                locale=args.locale,
+                allow_negative=args.allow_negative,
+                min_value=args.min_value,
+                max_value=args.max_value,
+            )
+            print(out)
+            return 0
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
 
     return 2
 
