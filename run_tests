@@ -1,0 +1,90 @@
+#!/usr/bin/env pwsh
+# run_tests - One-click test runner for mini_humanize
+# 
+# This script:
+# 1. Checks for required dependencies (pytest, pytest-cov)
+# 2. Installs missing dependencies if needed
+# 3. Runs the full test suite with coverage
+# 4. Can be run repeatedly in any clean environment
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "=== mini_humanize Test Runner ===" -ForegroundColor Cyan
+Write-Host ""
+
+# Check if Python is available
+try {
+    $pythonVersion = python --version 2>&1
+    Write-Host "Found: $pythonVersion" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: Python not found in PATH" -ForegroundColor Red
+    exit 1
+}
+
+# Check if we're in the right directory
+if (-not (Test-Path "pyproject.toml")) {
+    Write-Host "ERROR: pyproject.toml not found. Please run from project root." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
+Write-Host "Checking dependencies..." -ForegroundColor Yellow
+
+# Check for pytest
+$pytestInstalled = $false
+try {
+    python -c "import pytest" 2>$null
+    $pytestInstalled = $true
+    Write-Host "  pytest: installed" -ForegroundColor Green
+} catch {
+    Write-Host "  pytest: missing" -ForegroundColor Yellow
+}
+
+# Check for pytest-cov
+$pytestCovInstalled = $false
+try {
+    python -c "import pytest_cov" 2>$null
+    $pytestCovInstalled = $true
+    Write-Host "  pytest-cov: installed" -ForegroundColor Green
+} catch {
+    Write-Host "  pytest-cov: missing" -ForegroundColor Yellow
+}
+
+# Install missing dependencies
+if (-not $pytestInstalled -or -not $pytestCovInstalled) {
+    Write-Host ""
+    Write-Host "Installing missing dependencies..." -ForegroundColor Yellow
+    
+    try {
+        python -m pip install --quiet pytest>=8.0.0 pytest-cov>=5.0.0
+        Write-Host "Dependencies installed successfully" -ForegroundColor Green
+    } catch {
+        Write-Host "ERROR: Failed to install dependencies" -ForegroundColor Red
+        Write-Host "Please run manually: python -m pip install pytest pytest-cov" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+Write-Host ""
+Write-Host "Running test suite..." -ForegroundColor Cyan
+Write-Host "Command: python -m pytest tests/ -v --cov=src/mini_humanize --cov-report=term-missing" -ForegroundColor Gray
+Write-Host ""
+
+# Run tests with coverage
+try {
+    python -m pytest tests/ -v --cov=src/mini_humanize --cov-report=term-missing
+    $exitCode = $LASTEXITCODE
+    
+    Write-Host ""
+    if ($exitCode -eq 0) {
+        Write-Host "=== All tests passed ===" -ForegroundColor Green
+    } else {
+        Write-Host "=== Some tests failed ===" -ForegroundColor Red
+    }
+    
+    exit $exitCode
+} catch {
+    Write-Host ""
+    Write-Host "ERROR: Failed to run tests" -ForegroundColor Red
+    exit 1
+}
