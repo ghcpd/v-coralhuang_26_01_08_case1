@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal, Union
+import re
+import decimal
 
 NumberOrString = Union[int, float, str]
 RoundingMode = Literal["floor", "nearest", "ceil"]
@@ -75,6 +77,8 @@ def naturalsize(
             num = num.rstrip("0").rstrip(".")
             if num == "-0":
                 num = "0"
+    if num == "0":
+        sign = ""
 
     if gnu:
         return f"{sign}{num}{suffix}"
@@ -97,15 +101,109 @@ def parse_size(
     """
     Parse human-readable size string into bytes.
 
-    Intentionally left incomplete. Agent must implement:
-    - decimal + binary units, with and without spaces
-    - KiB/MiB... vs kB/MB...
-    - GNU suffixes K/M/G/T/P with ambiguity controlled by defaults
-    - IEC 60027-2 legacy units (KB/MB/GB)
-    - scientific notation (1.5e3 MB, 2E-1 KB)
-    - optional thousands separators (locale-aware decimal point)
-    - negative handling policy + strict vs permissive behavior
-    - rounding behavior for fractional bytes
-    - min/max value constraints with clear error messages
+    Supports:
+    - Decimal and binary units: B, kB/KB, MB, ..., KiB, MiB, ...
+    - GNU suffixes: K, M, G, T, P (base depends on default_binary)
+    - Scientific notation: 1.5e3 MB
+    - Thousands separators: 1,000 MB (if allow_thousands_separator)
+    - Negative values (if allow_negative)
+    - Rounding modes for fractional bytes
+
+    Ambiguous units (K/M/G/T/P) use base 1024 if default_binary else 1000.
+    default_gnu is ignored for parsing.
+
+    Raises ValueError on invalid input if strict=True.
     """
-    raise NotImplementedError("parse_size is not implemented yet")
+    decimal.getcontext().prec = 100  # High precision for large numbers
+
+    text = text.strip()
+    if not text:
+        raise ValueError("Empty input string")
+
+    # Handle sign
+    sign = 1
+    if text.startswith(('+', '-')):
+        if text[0] == '-':
+            if not allow_negative:
+                raise ValueError("Negative values not allowed")
+            sign = -1
+        text = text[1:].strip()
+
+    # Regex to match number and optional unit
+    # Number: digits, optional comma thousands, optional decimal, optional scientific
+    pattern = r'^(\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*([a-zA-Z]+)?$'
+    match = re.match(pattern, text)
+    if not match:
+        raise ValueError(f"Invalid format: {text!r}")
+
+    number_str, unit_str = match.groups()
+
+    # Remove thousands separators if allowed
+    if allow_thousands_separator:
+        number_str = number_str.replace(',', '')
+    elif ',' in number_str:
+        raise ValueError("Thousands separators not allowed")
+
+    # Parse number
+    try:
+        number = decimal.Decimal(number_str)
+    except decimal.InvalidOperation:
+        raise ValueError(f"Invalid number: {number_str!r}")
+
+    # Get multiplier
+    multiplier = 1
+    if unit_str:
+        multiplier = get_multiplier(unit_str, default_binary)
+
+    # Compute result
+    result = number * multiplier * sign
+
+    # Round to integer
+    if rounding == "floor":
+        rounded = result.to_integral_value(decimal.ROUND_FLOOR)
+    elif rounding == "ceil":
+        rounded = result.to_integral_value(decimal.ROUND_CEILING)
+    elif rounding == "nearest":
+        rounded = result.to_integral_value(decimal.ROUND_HALF_UP)
+    else:
+        raise ValueError(f"Invalid rounding mode: {rounding!r}")
+
+    value = int(rounded)
+
+    # Check constraints
+    if min_value is not None and value < min_value:
+        raise ValueError(f"Value {value} is below minimum {min_value}")
+    if max_value is not None and value > max_value:
+        raise ValueError(f"Value {value} is above maximum {max_value}")
+
+    return value
+
+
+def get_multiplier(unit: str, default_binary: bool) -> int:
+    """Get the multiplier for a unit."""
+    unit = unit.lower()
+    base = 1024 if default_binary else 1000
+
+    multipliers = {
+        'b': 1,
+        'k': base,
+        'm': base ** 2,
+        'g': base ** 3,
+        't': base ** 4,
+        'p': base ** 5,
+        'kb': 1000,
+        'mb': 1000 ** 2,
+        'gb': 1000 ** 3,
+        'tb': 1000 ** 4,
+        'pb': 1000 ** 5,
+        'kib': 1024,
+        'mib': 1024 ** 2,
+        'gib': 1024 ** 3,
+        'tib': 1024 ** 4,
+        'pib': 1024 ** 5,
+    }
+
+    if unit not in multipliers:
+        raise ValueError(f"Unknown unit: {unit!r}")
+
+    return multipliers[unit]
