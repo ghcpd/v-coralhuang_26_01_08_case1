@@ -1,0 +1,75 @@
+#!/usr/bin/env pwsh
+# run_tests - One-click test runner for mini_humanize
+# This script ensures dependencies are installed and runs the full test suite
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "=== mini_humanize Test Runner ===" -ForegroundColor Cyan
+Write-Host ""
+
+# Check if Python is available
+try {
+    $pythonCmd = Get-Command python -ErrorAction Stop
+    Write-Host "✓ Python found: $($pythonCmd.Source)" -ForegroundColor Green
+} catch {
+    Write-Host "✗ Python not found. Please install Python 3.10 or later." -ForegroundColor Red
+    exit 1
+}
+
+# Check Python version
+$pythonVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+Write-Host "✓ Python version: $pythonVersion" -ForegroundColor Green
+
+if ([float]$pythonVersion -lt 3.10) {
+    Write-Host "✗ Python 3.10 or later required. Current version: $pythonVersion" -ForegroundColor Red
+    exit 1
+}
+
+# Check if pytest is installed
+Write-Host ""
+Write-Host "Checking dependencies..." -ForegroundColor Cyan
+
+$pytestInstalled = python -c "import pytest" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "✗ pytest not found. Installing dependencies..." -ForegroundColor Yellow
+    python -m pip install --quiet pytest pytest-cov
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "✗ Failed to install dependencies" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "✓ Dependencies installed" -ForegroundColor Green
+} else {
+    Write-Host "✓ pytest already installed" -ForegroundColor Green
+}
+
+# Check pytest-cov
+$pytestCovInstalled = python -c "import pytest_cov" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "✗ pytest-cov not found. Installing..." -ForegroundColor Yellow
+    python -m pip install --quiet pytest-cov
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "✗ Failed to install pytest-cov" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "✓ pytest-cov installed" -ForegroundColor Green
+} else {
+    Write-Host "✓ pytest-cov already installed" -ForegroundColor Green
+}
+
+# Run tests
+Write-Host ""
+Write-Host "=== Running Tests ===" -ForegroundColor Cyan
+Write-Host ""
+
+python -m pytest tests/ -v --cov=mini_humanize --cov-report=term-missing
+
+$testExitCode = $LASTEXITCODE
+
+Write-Host ""
+if ($testExitCode -eq 0) {
+    Write-Host "=== All Tests Passed! ===" -ForegroundColor Green
+} else {
+    Write-Host "=== Tests Failed ===" -ForegroundColor Red
+}
+
+exit $testExitCode
